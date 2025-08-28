@@ -6,6 +6,7 @@ import (
 
 	"github.com/ratmirtech/techwb-l0/internal/models"
 	"github.com/ratmirtech/techwb-l0/internal/repo"
+	"github.com/rs/zerolog/log"
 )
 
 type Store struct {
@@ -21,6 +22,11 @@ func (s *Store) Get(id string) (models.Order, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	o, ok := s.m[id]
+	if ok {
+		log.Info().Str("order_uid", id).Msg("Found order in cache")
+	} else {
+		log.Warn().Str("order_uid", id).Msg("Order not found in cache")
+	}
 	return o, ok
 }
 
@@ -28,6 +34,7 @@ func (s *Store) Set(o models.Order) {
 	s.mu.Lock()
 	s.m[o.OrderUID] = o
 	s.mu.Unlock()
+	log.Info().Str("order_uid", o.OrderUID).Msg("Saved order to cache")
 }
 
 func (s *Store) Len() int {
@@ -39,6 +46,7 @@ func (s *Store) Len() int {
 func (s *Store) WarmUp(ctx context.Context, r *repo.PG) error {
 	orders, err := r.GetAllOrders(ctx)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to load orders from DB")
 		return err
 	}
 	s.mu.Lock()
@@ -46,5 +54,6 @@ func (s *Store) WarmUp(ctx context.Context, r *repo.PG) error {
 		s.m[o.OrderUID] = o
 	}
 	s.mu.Unlock()
+	log.Info().Int("count", len(orders)).Msg("Loaded orders to cache")
 	return nil
 }

@@ -22,17 +22,12 @@ func Run(ctx context.Context) {
 	logger.Init(cfg.LogPretty, cfg.LogLevel)
 	log.Info().Msg("starting service")
 
-	// DB
 	pg, err := repo.New(ctx, cfg.PGURL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("db connect")
 	}
 	defer pg.Close()
-	if err := pg.Migrate(ctx); err != nil {
-		log.Fatal().Err(err).Msg("db migrate")
-	}
 
-	// Cache
 	c := cache.New()
 	if err := c.WarmUp(ctx, pg); err != nil {
 		log.Warn().Err(err).Msg("cache warmup")
@@ -40,7 +35,6 @@ func Run(ctx context.Context) {
 		log.Info().Int("orders", c.Len()).Msg("cache warmed")
 	}
 
-	// HTTP
 	srv := httpapi.New(c, pg)
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -48,10 +42,8 @@ func Run(ctx context.Context) {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// Kafka consumer
 	consumer := kafka.NewConsumer(cfg, pg, c)
 
-	// run
 	errCh := make(chan error, 2)
 	go func() { errCh <- consumer.Run(ctx) }()
 	go func() {

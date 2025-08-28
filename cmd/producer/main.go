@@ -4,91 +4,104 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math/rand"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"github.com/ratmirtech/techwb-l0/internal/models"
 	"github.com/segmentio/kafka-go"
 )
+
+func env(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
 
 func main() {
 	_ = godotenv.Load()
 
-	brokers := env("KAFKA_BROKERS", "localhost:9092")
+	brokers := env("KAFKA_BROKERS", "kafka:9092")
 	topic := env("KAFKA_TOPIC", "orders")
 
-	payloadPath := ""
-	if len(os.Args) > 1 {
-		payloadPath = os.Args[1]
-	}
-	var msg []byte
-	var err error
-	if payloadPath != "" {
-		msg, err = os.ReadFile(payloadPath)
-		if err != nil {
-			log.Fatalf("read payload: %v", err)
-		}
-	} else {
-		// минимальный валидный пример
-		msg = []byte(`{
-		 "order_uid":"b563feb7b2b84b6test",
-		 "track_number":"WBILMTESTTRACK",
-		 "entry":"WBIL",
-		 "delivery":{"name":"Test Testov","phone":"+9720000000","zip":"2639809","city":"Kiryat Mozkin","address":"Ploshad Mira 15","region":"Kraiot","email":"test@gmail.com"},
-		 "payment":{"transaction":"b563feb7b2b84b6test","request_id":"","currency":"USD","provider":"wbpay","amount":1817,"payment_dt":1637907727,"bank":"alpha","delivery_cost":1500,"goods_total":317,"custom_fee":0},
-		 "items":[{"chrt_id":9934930,"track_number":"WBILMTESTTRACK","price":453,"rid":"ab4219087a764ae0btest","name":"Mascaras","sale":30,"size":"0","total_price":317,"nm_id":2389212,"brand":"Vivienne Sabo","status":202}],
-		 "locale":"en","internal_signature":"","customer_id":"test","delivery_service":"meest","shardkey":"9","sm_id":99,"date_created":"2021-11-26T06:22:19Z","oof_shard":"1"
-		}`)
+	order := generateOrder()
+	msg, err := json.Marshal(order)
+	if err != nil {
+		log.Fatalf("Can't make JSON: %v", err)
 	}
 
-	// быстрая проверка на JSON
-	var tmp map[string]any
-	if err := json.Unmarshal(msg, &tmp); err != nil {
-		log.Fatalf("invalid json: %v", err)
-	}
-
-	w := &kafka.Writer{
-		Addr:         kafka.TCP(splitComma(brokers)...),
+	writer := &kafka.Writer{
+		Addr:         kafka.TCP(strings.Split(brokers, ",")...),
 		Topic:        topic,
 		RequiredAcks: kafka.RequireAll,
 		Balancer:     &kafka.LeastBytes{},
 		Async:        false,
 		BatchTimeout: 200 * time.Millisecond,
 	}
-	defer w.Close()
+	defer writer.Close()
 
-	if err := w.WriteMessages(context.Background(),
+	if err := writer.WriteMessages(context.Background(),
 		kafka.Message{Value: msg}); err != nil {
-		log.Fatalf("write: %v", err)
+		log.Fatalf("Can't send to Kafka: %v", err)
 	}
-	log.Println("sent")
+	log.Printf("Sent order with ID: %s", order.OrderUID)
 }
 
-func env(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
-}
+func generateOrder() models.Order {
+	uid := uuid.New().String()[:16] + "test"
+	trackNumber := "TRACK" + uuid.New().String()[:8]
+	now := time.Now().UTC()
 
-func splitComma(s string) []string {
-	var out []string
-	for _, p := range []rune(s) {
-		_ = p
+	return models.Order{
+		OrderUID:    uid,
+		TrackNumber: trackNumber,
+		Entry:       "TEST",
+		Delivery: models.Delivery{
+			Name:    "User",
+			Phone:   "+79001234567",
+			Zip:     "123456",
+			City:    "Test City",
+			Address: "Street 1",
+			Region:  "Test Region",
+			Email:   "user@test.com",
+		},
+		Payment: models.Payment{
+			Transaction:  uid,
+			Currency:     "USD",
+			Provider:     "testpay",
+			Amount:       1000,
+			PaymentDt:    time.Now().Unix(),
+			Bank:         "testbank",
+			DeliveryCost: 200,
+			GoodsTotal:   800,
+			CustomFee:    0,
+		},
+		Items: []models.Item{
+			{
+				ChrtID:      1000000 + rand.Intn(1000000),
+				TrackNumber: trackNumber,
+				Price:       500,
+				RID:         "",
+				Name:        "Product",
+				Sale:        10,
+				Size:        "M",
+				TotalPrice:  450,
+				NmID:        2000000 + rand.Intn(1000000),
+				Brand:       "Test Brand",
+				Status:      200,
+			},
+		},
+		Locale:          "en",
+		CustomerID:      "customer1",
+		DeliveryService: "testdelivery",
+		Shardkey:        "1",
+		SmID:            rand.Intn(100),
+		DateCreated:     now,
+		OofShard:        "1",
 	}
-	var cur string
-	for _, c := range s {
-		if c == ',' {
-			if cur != "" {
-				out = append(out, cur)
-				cur = ""
-			}
-			continue
-		}
-		cur += string(c)
-	}
-	if cur != "" {
-		out = append(out, cur)
-	}
-	return out
 }

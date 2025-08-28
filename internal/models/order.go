@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -20,34 +19,4 @@ type Order struct {
 	SmID              int       `json:"sm_id"`
 	DateCreated       time.Time `json:"date_created"`
 	OofShard          string    `json:"oof_shard"`
-}
-
-func (o *Order) UnmarshalJSON(b []byte) error {
-	type alias Order
-	aux := struct {
-		DateCreated string `json:"date_created"`
-		*alias
-	}{alias: (*alias)(o)}
-	if err := json.Unmarshal(b, &aux); err != nil {
-		return err
-	}
-	if aux.DateCreated != "" {
-		t, err := time.Parse(time.RFC3339, aux.DateCreated)
-		if err != nil {
-			return err
-		}
-		o.DateCreated = t
-	}
-	return nil
-}
-
-func (o Order) MarshalJSON() ([]byte, error) {
-	type alias Order
-	return json.Marshal(struct {
-		DateCreated string `json:"date_created"`
-		alias
-	}{
-		DateCreated: o.DateCreated.UTC().Format(time.RFC3339),
-		alias:       (alias)(o),
-	})
 }

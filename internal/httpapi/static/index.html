@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="utf-8"/>
@@ -7,24 +7,60 @@
     <style>
         body{font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 32px;}
         input, button{font-size:16px; padding:8px 12px;}
-        pre{background:#f5f5f7; padding:16px; border-radius:8px; overflow:auto;}
+        pre, .parsed{background:#f5f5f7; padding:16px; border-radius:8px; overflow:auto;}
         .row{display:flex; gap:8px; margin-bottom:16px}
+        .block{border:1px solid #ccc; border-radius:6px; margin:8px 0; padding:8px; background:#fff;}
+        .key{font-weight:bold;}
+        .list-item{margin-left:16px; border-left:3px solid #eee; padding-left:8px; margin-bottom:6px;}
     </style>
 </head>
 <body>
 <h2>Поиск заказа</h2>
 <div class="row">
     <input id="oid" placeholder="order_uid" size="40"/>
-    <button onclick="load()">Получить</button>
+    <button onclick="load('text')">Получить</button>
+    <button onclick="load('json')">Json</button>
+    <button onclick="load('pretty')">Разобрать</button>
 </div>
-<pre id="out">Ответ появится здесь …</pre>
+<div id="out" class="parsed">Ответ появится здесь …</div>
 <script>
-    async function load() {
+    async function load(mode) {
         const id = document.getElementById('oid').value.trim();
         if (!id) { alert('Введите order_id'); return; }
         const r = await fetch('/api/order/' + encodeURIComponent(id));
-        document.getElementById('out').textContent =
-            (r.ok ? await r.text() : ('Ошибка '+r.status+': '+await r.text()));
+        if (!r.ok) {
+            document.getElementById('out').textContent =
+                'Ошибка ' + r.status + ': ' + await r.text();
+            return;
+        }
+
+        if (mode === 'json') {
+            // pretty print JSON
+            const data = await r.json();
+            document.getElementById('out').innerHTML =
+                `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        } else if (mode === 'pretty') {
+            // разобрать на блоки
+            const data = await r.json();
+            document.getElementById('out').innerHTML = renderObject(data);
+        } else {
+            // просто текст
+            document.getElementById('out').textContent = await r.text();
+        }
+    }
+
+    function renderObject(obj) {
+        if (Array.isArray(obj)) {
+            return obj.map((v,i)=>`<div class="list-item"><div class="key">[${i}]</div>${renderObject(v)}</div>`).join("");
+        } else if (typeof obj === "object" && obj !== null) {
+            return `<div class="block">` + 
+                Object.entries(obj).map(([k,v]) =>
+                    `<div><span class="key">${k}:</span> ${typeof v==="object" ? renderObject(v) : v}</div>`
+                ).join("") + 
+                `</div>`;
+        } else {
+            return obj;
+        }
     }
 </script>
 </body>

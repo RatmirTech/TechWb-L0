@@ -31,8 +31,7 @@ func main() {
 	port := getenv("POSTGRES_PORT", "5432")
 	user := getenv("POSTGRES_USER", "postgres")
 	pass := getenv("POSTGRES_PASSWORD", "postgres")
-	// поддерживаем оба имени: POSTGRES_DB и POSTGRES_DATABASE
-	name := getenv("POSTGRES_DB", getenv("POSTGRES_DATABASE", "orders"))
+	name := getenv("POSTGRES_DB", "orders")
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, pass, host, port, name)
 

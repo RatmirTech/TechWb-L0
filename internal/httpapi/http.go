@@ -12,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-//go:embed static/index.html
 var indexHTML string
 
 type API struct {
@@ -25,8 +24,8 @@ func New(c *cache.Store, r *repo.PG) *API { return &API{cache: c, repo: r} }
 func (a *API) Router() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", a.handleIndex)
-	mux.HandleFunc("/order/", a.handleGetOrder)     // GET /order/{id}
-	mux.HandleFunc("/api/order/", a.handleGetOrder) // alias
+	mux.HandleFunc("/order/", a.handleGetOrder)
+	mux.HandleFunc("/api/order/", a.handleGetOrder)
 	return logMiddleware(mux)
 }
 
