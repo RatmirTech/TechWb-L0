@@ -35,16 +35,13 @@
         }
 
         if (mode === 'json') {
-            // pretty print JSON
             const data = await r.json();
             document.getElementById('out').innerHTML =
                 `<pre>${JSON.stringify(data, null, 2)}</pre>`;
         } else if (mode === 'pretty') {
-            // разобрать на блоки
             const data = await r.json();
             document.getElementById('out').innerHTML = renderObject(data);
         } else {
-            // просто текст
             document.getElementById('out').textContent = await r.text();
         }
     }
