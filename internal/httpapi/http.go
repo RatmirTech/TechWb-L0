@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+//go:embed static/index.html
 var indexHTML string
 
 type API struct {
